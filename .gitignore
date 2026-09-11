@@ -1,0 +1,36 @@
+# Secretos y configuración local — NUNCA se commitean
+.env
+*.env
+!.env.example
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Logs generados por el proyecto
+logs/
+*.log
+
+# Testing y cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Herramientas
+.mypy_cache/
+.ruff_cache/
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

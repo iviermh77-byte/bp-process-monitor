@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bp-process-monitor"
+version = "0.1.0"
+description = "Monitorea procesos de Blue Prism en la BD productiva y reporta su estado a Smartsheet."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Ivier Morales" }]
+
+dependencies = [
+    "pydantic-settings>=2.4",
+    "sqlalchemy>=2.0",
+    "pyodbc>=5.1",
+    "smartsheet-python-sdk>=3.0",
+    "tenacity>=8.5",
+    # zoneinfo (usado en services/smartsheet_sync.py para TZ = ZoneInfo(...))
+    # no trae la base de datos IANA en Windows -- a diferencia de Linux/macOS,
+    # que la toman del sistema operativo. Sin este paquete, cualquier import
+    # de smartsheet_sync.py falla en Windows con ZoneInfoNotFoundError.
+    "tzdata>=2024.1; sys_platform == \"win32\"",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-mock>=3.14",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[project.scripts]
+bp-process-monitor = "bp_process_monitor.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "smartsheet.*"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+# "integration" excluida por defecto: requiere una BD de Blue Prism real
+# (ver docstring de tests/test_queries.py). Correrla explícitamente con:
+#   pytest -m integration
+addopts = "-m \"not integration\" --cov=bp_process_monitor --cov-report=term-missing"
+markers = [
+    "integration: prueba que requiere una BD u otro servicio externo real; excluida por defecto.",
+]
+
+[tool.coverage.run]
+source = ["bp_process_monitor"]
