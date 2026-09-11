@@ -1,75 +1,139 @@
-# bp-process-monitor
+# BP Process Monitor
 
-Monitorea los procesos de Blue Prism en la base de datos productiva (qué procesos existen,
-en qué server corren y su estado) y reporta ese estado a Smartsheet de forma periódica.
+![CI](https://github.com/iviermh77-byte/bp-process-monitor/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![Coverage](https://img.shields.io/badge/coverage-88%25-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
-## Estado del proyecto
+Pipeline en Python que monitorea en tiempo real la salud de los runtimes de **Blue Prism** consultando directamente la base de datos productiva (`BPAProcess` / `BPASession` / `BPAResource`), y sincroniza el estado de cada uno a una hoja de **Smartsheet**, con alertado nativo cuando un proceso queda en estado `Warning`.
 
-En construcción — ver `docs/architecture.md` para el diseño y el plan de trabajo por pasos.
+Diseñado como **plantilla reutilizable**: no está atado a un cliente específico -- cualquier ambiente de Blue Prism puede monitorearse apuntando el pipeline a su propia base de datos y hoja de Smartsheet, sin tocar código.
 
-## Estructura
+---
 
+## Vista del dashboard
+
+El pipeline sincroniza el estado de cada runtime a Smartsheet, donde una Alert Rule nativa notifica automáticamente cuando algún proceso pasa a `Warning`:
+
+![Dashboard preview](docs/dashboard-preview.png)
+
+---
+
+## Cómo funciona
+
+```mermaid
+flowchart LR
+    A[SQL Server<br/>Blue Prism DB] -->|SQLAlchemy + pyodbc| B[bp_process_monitor]
+    B -->|Mapea estados por runtime| C{Estado del runtime}
+    C -->|Running / Completed / Terminated / Warning / Sin actividad| D[Smartsheet API]
+    D -->|Alert Rule nativa| E[Notificación por Warning]
 ```
-src/bp_process_monitor/
-├── config.py           # Carga y valida configuración (pydantic-settings)
-├── logging_config.py   # Logging estructurado con rotación
-├── db/
-│   ├── connection.py   # Engine SQLAlchemy de solo lectura hacia la BD de BP
-│   └── queries.py      # Consultas SQL parametrizadas
-├── models.py            # Modelos de datos (ProcessStatus, ServerInfo, ...)
-├── services/
-│   ├── process_monitor.py  # Orquesta: BD -> reporte
-│   └── smartsheet_sync.py  # Reporte -> Smartsheet (con reintentos)
-└── main.py               # Punto de entrada: una corrida completa
-```
 
-## Requisitos
+1. Consulta `BPASession` / `BPAProcess` / `BPAResource` en la base de datos productiva de Blue Prism.
+2. Por cada runtime, determina su estado (`Running`, `Completed`, `Terminated`, `Warning`, `Stopped`, o `Sin actividad` si no tuvo sesiones recientes). Cuando un runtime tuvo más de un proceso en la ventana evaluada, se elige el más relevante (alerta primero, luego el más reciente).
+3. Hace *upsert* en Smartsheet por nombre de runtime -- la hoja puede arrancar vacía y se va poblando sola.
+4. Una Alert Rule nativa de Smartsheet dispara la notificación cuando el estado es `Warning` (Blue Prism ya alerta `Terminated` por su cuenta).
+5. Corre desatendido cada 30 minutos vía Windows Task Scheduler, con logging rotativo y reintentos ante fallas transitorias de red (Smartsheet API).
 
-- Python 3.11+
-- Driver ODBC de SQL Server instalado en el servidor (`ODBC Driver 17` o superior)
-- Un usuario de base de datos con permisos de **solo lectura** sobre las tablas de Blue Prism
-- Una API key de Smartsheet con permiso de escritura sobre el sheet de destino
+---
 
-## Instalación (desarrollo local)
+## Stack técnico
+
+| Componente | Tecnología |
+|---|---|
+| Lenguaje | Python 3.11+ |
+| Acceso a datos | SQLAlchemy + pyodbc (SQL Server) |
+| Sincronización | smartsheet-python-sdk |
+| Configuración | pydantic-settings (`.env`) |
+| Resiliencia | tenacity (retries con backoff) |
+| Logging | `TimedRotatingFileHandler` (rotación semanal, retención configurable) |
+| Testing | pytest + pytest-cov |
+| Calidad de código | ruff (lint) + mypy --strict (tipos) |
+| Despliegue | Windows Task Scheduler (ejecución desatendida cada 30 min) |
+
+---
+
+## Instalación
 
 ```bash
+git clone https://github.com/iviermh77-byte/bp-process-monitor.git
+cd bp-process-monitor
+
 python -m venv .venv
-.venv\Scripts\activate          # Windows
+.venv\Scripts\activate   # Windows
+
 pip install -e ".[dev]"
-copy .env.example .env          # y completa los valores reales
 ```
 
-## Ejecución
+## Configuración
+
+Copia `.env.example` a `.env` y llena tus valores:
+
+```bash
+copy .env.example .env
+```
+
+| Variable | Descripción |
+|---|---|
+| `BP_DB_SERVER` | Host del SQL Server de Blue Prism |
+| `BP_DB_NAME` | Nombre de la base de datos |
+| `BP_DB_USER` / `BP_DB_PASSWORD` | Credenciales de un usuario de BD de **solo lectura** |
+| `BP_DB_DRIVER` | Driver ODBC (default: `ODBC Driver 17 for SQL Server`) |
+| `SMARTSHEET_API_KEY` | API key de Smartsheet |
+| `SMARTSHEET_SHEET_ID` | ID de la hoja destino |
+| `RUN_INTERVAL_MINUTES` | Minutos entre corridas (si se corre como proceso persistente) |
+| `LOG_LEVEL` / `LOG_DIR` / `LOG_BACKUP_WEEKS` | Nivel, carpeta y retención de logs |
+
+## Uso
 
 ```bash
 bp-process-monitor
 ```
 
-## Pruebas
+Corre una vez, sincroniza el estado actual a Smartsheet, y sale con código `0` (éxito) o `1` (falla, con traceback en el log). Pensado para dispararse periódicamente vía un scheduler externo (ver `deploy/register-scheduled-task.ps1` para Windows Task Scheduler).
+
+## Tests
 
 ```bash
-pytest
+pytest                  # suite completa (excluye tests de integración contra BD real)
+pytest -m integration   # incluye tests de integración (requiere BD accesible)
+pytest --cov            # con reporte de cobertura
 ```
 
-La suite excluye por defecto las pruebas marcadas `integration` (las que
-necesitan una BD de Blue Prism real). Para correrlas explícitamente:
+## Estructura del proyecto
 
-```bash
-pytest -m integration
+```
+bp-process-monitor/
+├── src/bp_process_monitor/
+│   ├── config.py              # Settings (pydantic-settings)
+│   ├── db/
+│   │   ├── connection.py
+│   │   └── queries.py
+│   ├── models.py
+│   ├── services/
+│   │   ├── process_monitor.py
+│   │   └── smartsheet_sync.py
+│   ├── logging_config.py
+│   └── main.py
+├── scripts/
+│   └── smoke_test_db.py       # Smoke test manual contra la BD real (no es parte de pytest)
+├── tests/
+├── docs/
+│   └── architecture.md
+├── .env.example
+└── pyproject.toml
 ```
 
-Cada corrida imprime el reporte de cobertura de `bp_process_monitor` en
-consola (`--cov-report=term-missing`, configurado en `pyproject.toml`).
+## Roadmap
 
-## Logging
+- [ ] Alertado activo ante fallo persistente del propio pipeline (correo/webhook cuando Task Scheduler agota reintentos).
+- [ ] Alert Rule adicional en Smartsheet para el estado "Sin actividad".
+- [ ] Métricas históricas (tiempo en cada estado por runtime).
 
-Cada corrida escribe en `logs/bp_process_monitor.log` (carpeta configurable
-con `LOG_DIR`). La rotación es semanal -- los domingos a medianoche -- y se
-conservan `LOG_BACKUP_WEEKS` semanas de historial (por defecto 4, ~1 mes).
-El nivel se controla con `LOG_LEVEL` (por defecto `INFO`).
+## Licencia
 
-## Seguridad
+MIT -- ver [LICENSE](LICENSE).
 
-- Ninguna credencial vive en el código ni en git — todo llega por variables de entorno.
-- El acceso a la BD de Blue Prism es exclusivamente de lectura.
-- Ver `.env.example` para la lista de variables requeridas.
+---
+
+Desarrollado por **Ivier Morales** -- RPA Developer & Solution Designer (Blue Prism) explorando la integración de pipelines de datos/Python en soluciones de automatización empresarial.
