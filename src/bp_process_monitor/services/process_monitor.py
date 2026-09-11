@@ -38,7 +38,7 @@ from bp_process_monitor.models import (
 
 logger = logging.getLogger(__name__)
 
-# Mapeo confirmado contra la BD productiva de Telmex cruzando
+# Mapeo confirmado contra una BD productiva real de Blue Prism cruzando
 # `SELECT DISTINCT statusid FROM BPASession` con el patrón de
 # enddatetime/terminationreason por statusid (ver docs/architecture.md,
 # sección "Alcance de datos", para el detalle completo de cómo se validó
@@ -94,7 +94,7 @@ def _resources_without_recent_activity(
     """Filas de ``resources`` cuyo ``resourceid`` no aparece en ninguna
     sesión reciente.
 
-    Los 12 runtimes de Telmex trabajan 24/7: la ausencia total de
+    Los runtimes del ambiente trabajan 24/7: la ausencia total de
     sesiones en la ventana de lookback es en sí misma la señal de alerta
     (resource desconectado, scheduler caído, etc.), sin importar qué
     proceso específico debería haber corrido ahí. Por eso se evalúa a

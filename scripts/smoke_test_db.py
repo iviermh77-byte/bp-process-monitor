@@ -17,7 +17,7 @@ SELECT/WITH), por lo que es seguro correrlo contra el ambiente productivo.
 Como correrlo (IMPORTANTE: desde la raiz del repo, para que Settings
 encuentre el archivo .env con env_file=".env" relativo):
 
-    cd C:\bp-process-monitor
+    cd <ruta-del-repo>
     .venv\Scripts\python.exe scripts\smoke_test_db.py
 
 Parametro opcional: ventana de horas hacia atras para "sesiones recientes"

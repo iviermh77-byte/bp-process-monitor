@@ -39,9 +39,9 @@ Smartsheet de forma periódica (cada N minutos).
 
 **Nota sobre interpretación de estados (cerrado en el paso 5):** `db/queries.py`
 expone `statusid` (BPASession) *sin traducir*; la traducción vive en
-`services/process_monitor.STATUS_MAP`. Se confirmó contra la BD productiva
-de Telmex cruzando `SELECT DISTINCT statusid FROM BPASession` con el patrón
-de `enddatetime`/`terminationreason` por statusid:
+`services/process_monitor.STATUS_MAP`. Se confirmó contra una BD productiva
+real de Blue Prism cruzando `SELECT DISTINCT statusid FROM BPASession` con el
+patrón de `enddatetime`/`terminationreason` por statusid:
 
 | statusid | Estado          | Evidencia |
 |---|---|---|
@@ -58,7 +58,7 @@ mapeo en producción — es el estado 5 (Warning) el que dispara la alerta de
 Smartsheet del paso 6, así que vale la pena esa verificación.
 
 **Decisión de diseño (paso 5): "sin actividad" se evalúa por runtime, no por
-proceso.** Los 12 runtimes de Telmex operan 24/7, así que un runtime sin
+proceso.** En el ambiente de referencia, los runtimes operan 24/7, así que un runtime sin
 ninguna sesión en la ventana de lookback es en sí mismo la señal de alerta
 (desconexión, scheduler caído), independientemente de qué proceso debería
 correr ahí. Cruzar cada proceso contra cada runtime habría generado falsos

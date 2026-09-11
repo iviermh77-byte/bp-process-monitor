@@ -75,6 +75,6 @@ def resource_row_factory():
 @pytest.fixture
 def test_settings() -> Settings:
     """``Settings`` de prueba, con ``_env_file=None`` para NO leer el ``.env``
-    real del proyecto (que puede tener credenciales reales de Telmex).
+    real del proyecto (que puede tener credenciales reales de un ambiente productivo).
     """
     return Settings(_env_file=None, **REQUIRED_SETTINGS_ENV)

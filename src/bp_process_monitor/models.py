@@ -20,7 +20,7 @@ class RunStatus(str, Enum):
 
     Traducido desde ``BPASession.statusid`` (crudo, sin interpretar) por
     ``services/process_monitor.STATUS_MAP``. El mapeo numérico fue
-    confirmado contra la BD productiva de Telmex cruzando
+    confirmado contra una BD productiva real de Blue Prism cruzando
     ``SELECT DISTINCT statusid FROM BPASession`` con el patrón de
     ``enddatetime``/``terminationreason`` por statusid (ver
     docs/architecture.md, sección "Alcance de datos", para el detalle):
@@ -82,7 +82,7 @@ class ProcessStatusRecord:
 class ResourceActivityRecord:
     """Actividad reciente de un runtime resource.
 
-    Los 12 runtimes del ambiente Telmex operan 24/7: un resource sin
+    Los runtimes del ambiente operan 24/7: un resource sin
     ninguna sesión dentro de la ventana de lookback es en sí mismo un
     síntoma de problema (desconexión, scheduler caído, resource colgado),
     independientemente del estado de cualquier proceso puntual. Por eso
